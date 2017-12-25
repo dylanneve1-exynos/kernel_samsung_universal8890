@@ -189,8 +189,12 @@ static int __init enforcing_setup(char *str)
 	unsigned long enforcing;
 	if (!kstrtoul(str, 0, &enforcing))
 // [ SEC_SELINUX_PORTING_COMMON
-#ifdef CONFIG_ALWAYS_ENFORCE
+#if defined(SELINUX_ALWAYS_ENFORCE) || \
+	defined(SELINUX_DEFAULT_ENFORCE)
 		selinux_enforcing = 1;
+#elif defined(SELINUX_ALWAYS_PERMISSIVE) || \
+	  defined(SELINUX_DEFAULT_PERMISSIVE)
+		selinux_enforcing = 0;
 #else
 		selinux_enforcing = enforcing ? 1 : 0;
 #endif
@@ -208,7 +212,10 @@ static int __init selinux_enabled_setup(char *str)
 	unsigned long enabled;
 	if (!kstrtoul(str, 0, &enabled))
 // [ SEC_SELINUX_PORTING_COMMON
-#ifdef CONFIG_ALWAYS_ENFORCE
+#if defined(SELINUX_ALWAYS_ENFORCE) || \
+	defined(SELINUX_DEFAULT_ENFORCE) || \
+    defined(SELINUX_ALWAYS_PERMISSIVE) || \
+	defined(SELINUX_DEFAULT_PERMISSIVE)
 		selinux_enabled = 1;
 #else
 		selinux_enabled = enabled ? 1 : 0;
@@ -254,7 +261,7 @@ static int selinux_peerlbl_enabled(void)
 	return (selinux_policycap_alwaysnetwork || netlbl_enabled() || selinux_xfrm_enabled());
 }
 
-static int selinux_netcache_avc_callback(u32 event)
+/*static int selinux_netcache_avc_callback(u32 event)
 {
 	if (event == AVC_CALLBACK_RESET) {
 		sel_netif_flush();
@@ -263,7 +270,7 @@ static int selinux_netcache_avc_callback(u32 event)
 		synchronize_net();
 	}
 	return 0;
-}
+}*/
 
 /*
  * initialise the security for the init task
@@ -5700,8 +5707,16 @@ static int selinux_nlmsg_perm(struct sock *sk, struct sk_buff *skb)
 			       " protocol=%hu nlmsg_type=%hu sclass=%hu\n",
 			       sk->sk_protocol, nlh->nlmsg_type, sksec->sclass);
 // [ SEC_SELINUX_PORTING_COMMON
-#ifdef CONFIG_ALWAYS_ENFORCE
+#if defined(SELINUX_ALWAYS_ENFORCE)
 			if (security_get_allow_unknown())
+#elif defined(SELINUX_ALWAYS_PERMISSIVE)
+			/*
+			 * - selinux_enforcing = 0, because of permissive
+			 * - !selinux_enforcing would result in 1
+			 *
+			 * means the if would be completley useless
+			 */
+			// if (!selinux_enforcing || security_get_allow_unknown())
 #else
 			if (!selinux_enforcing || security_get_allow_unknown())
 #endif
@@ -7187,8 +7202,9 @@ static __init int selinux_init(void)
 {
 	if (!security_module_enable(&selinux_ops)) {
 // [ SEC_SELINUX_PORTING_COMMON
-#ifdef CONFIG_ALWAYS_ENFORCE
-		selinux_enabled = 1;
+#if defined(SELINUX_ALWAYS_ENFORCE) || \
+	defined(SELINUX_ALWAYS_PERMISSIVE)
+		selinux_enabled = 1;	
 #else
 		selinux_enabled = 0;
 #endif
@@ -7216,11 +7232,12 @@ static __init int selinux_init(void)
 	if (register_security(&selinux_ops))
 		panic("SELinux: Unable to register with kernel.\n");
 
-	if (avc_add_callback(selinux_netcache_avc_callback, AVC_CALLBACK_RESET))
-		panic("SELinux: Unable to register AVC netcache callback\n");
+
 // [ SEC_SELINUX_PORTING_COMMON
-#ifdef CONFIG_ALWAYS_ENFORCE
-		selinux_enforcing = 1;
+#if defined(SELINUX_ALWAYS_ENFORCE)
+	selinux_enforcing = 1;
+#elif defined(SELINUX_ALWAYS_PERMISSIVE)
+	selinux_enforcing = 0;
 #endif
 // ] SEC_SELINUX_PORTING_COMMON
 	if (selinux_enforcing)
@@ -7293,21 +7310,21 @@ static struct nf_hook_ops selinux_nf_ops[] = {
 
 static int __init selinux_nf_ip_init(void)
 {
-	int err;
-// [ SEC_SELINUX_PORTING_COMMON
-#ifdef CONFIG_ALWAYS_ENFORCE
-		selinux_enabled = 1;
+	int err = 0;
+#if defined(SELINUX_ALWAYS_ENFORCE) || \
+	defined(SELINUX_ALWAYS_PERMISSIVE)
+	selinux_enabled = 1;
 #endif
 // ] SEC_SELINUX_PORTING_COMMON
 	if (!selinux_enabled)
-		return 0;
+		goto out;
 
 	printk(KERN_DEBUG "SELinux:  Registering netfilter hooks\n");
 
 	err = nf_register_hooks(selinux_nf_ops, ARRAY_SIZE(selinux_nf_ops));
 	if (err)
 		panic("SELinux: nf_register_hooks: error %d\n", err);
-
+out:
 	return 0;
 }
 
