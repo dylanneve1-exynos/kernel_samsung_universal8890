@@ -34,9 +34,7 @@ static int sdcardfs_d_revalidate(struct dentry *dentry, unsigned int flags)
 	struct dentry *parent_lower_dentry = NULL;
 	struct dentry *lower_cur_parent_dentry = NULL;
 	struct dentry *lower_dentry = NULL;
-#if ANDROID_VERSION >= 70000
 	struct sdcardfs_inode_info *pinfo;
-#endif
 
 	if (flags & LOOKUP_RCU)
 		return -ECHILD;
@@ -68,7 +66,6 @@ static int sdcardfs_d_revalidate(struct dentry *dentry, unsigned int flags)
 	lower_dentry = lower_path.dentry;
 	lower_cur_parent_dentry = dget_parent(lower_dentry);
 
-#if ANDROID_VERSION >= 70000
 	pinfo = SDCARDFS_I(parent_dentry->d_inode);
 	if (pinfo->perm == PERM_ANDROID_OBB && dentry->d_inode &&
 			uid_eq(dentry->d_inode->i_uid, GLOBAL_ROOT_UID)) {
@@ -76,7 +73,6 @@ static int sdcardfs_d_revalidate(struct dentry *dentry, unsigned int flags)
 		err = 0;
 		goto out;
 	}
-#endif
 
 	spin_lock(&lower_dentry->d_lock);
 	if (d_unhashed(lower_dentry)) {
