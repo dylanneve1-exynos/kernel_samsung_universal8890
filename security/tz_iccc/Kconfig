@@ -6,11 +6,11 @@ config TZ_ICCC_NOS_SUPPORT
 	bool "TZ ICCC Support"
 	default y
 	---help---
-	Adds support for TZ ICCC
+	Provide kernel api  ICCC support.
 
 config TZ_ICCC
 	bool "TZ ICCC"
-	depends on TIMA && || TZ_ICCC_NOS_SUPPORT
+	depends on TIMA && TZ_ICCC_NOS_SUPPORT
 	default n
 	---help---
 	Provide kernel api for reading and writing ICCC secure parameters.
